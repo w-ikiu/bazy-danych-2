@@ -1,0 +1,43 @@
+{
+  "info": {
+    "name": "City Heroes API - Testy",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Rejestracja bohatera",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Hulk\",\n  \"power\": \"strength\"\n}" },
+        "url": { "raw": "http://localhost:3000/api/v1/heroes", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "heroes"] }
+      }
+    },
+    {
+      "name": "2. Zgłoszenie incydentu (krytyczny)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"location\": \"Bank Centralny\",\n  \"severity_level\": \"critical\"\n}" },
+        "url": { "raw": "http://localhost:3000/api/v1/incidents", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents"] }
+      }
+    },
+    {
+      "name": "3. Przydzielenie bohatera do incydentu",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\n  \"hero_id\": 1\n}" },
+        "url": { "raw": "http://localhost:3000/api/v1/incidents/1/assign", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents", "1", "assign"] }
+      }
+    },
+    {
+      "name": "4. Zamknięcie incydentu",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": { "raw": "http://localhost:3000/api/v1/incidents/1/resolve", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents", "1", "resolve"] }
+      }
+    }
+  ]
+}
