@@ -1,43 +1,53 @@
 {
   "info": {
-    "name": "City Heroes API - Testy",
+    "name": "Heroes API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "1. Rejestracja bohatera",
-      "request": {
-        "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Hulk\",\n  \"power\": \"strength\"\n}" },
-        "url": { "raw": "http://localhost:3000/api/v1/heroes", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "heroes"] }
-      }
+      "name": "1. Rejestracja bohatera (sukces)",
+      "event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });", "pm.test(\"Zwraca nowo utworzonego bohatera z ID\", function () { var jsonData = pm.response.json(); pm.expect(jsonData.data).to.have.property(\"id\"); });" ], "type": "text/javascript" } } ],
+      "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Hulk\",\n  \"power\": \"strength\"\n}" }, "url": { "raw": "http://localhost:3000/api/v1/heroes", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "heroes"] } }
     },
     {
-      "name": "2. Zgłoszenie incydentu (krytyczny)",
-      "request": {
-        "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{\n  \"location\": \"Bank Centralny\",\n  \"severity_level\": \"critical\"\n}" },
-        "url": { "raw": "http://localhost:3000/api/v1/incidents", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents"] }
-      }
+      "name": "2. Rejestracja bohatera (sukces)",
+      "event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });" ], "type": "text/javascript" } } ],
+      "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Flash\",\n  \"power\": \"speed\"\n}" }, "url": { "raw": "http://localhost:3000/api/v1/heroes", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "heroes"] } }
     },
     {
-      "name": "3. Przydzielenie bohatera do incydentu",
-      "request": {
-        "method": "POST",
-        "header": [ { "key": "Content-Type", "value": "application/json" } ],
-        "body": { "mode": "raw", "raw": "{\n  \"hero_id\": 1\n}" },
-        "url": { "raw": "http://localhost:3000/api/v1/incidents/1/assign", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents", "1", "assign"] }
-      }
+      "name": "3. Brakujące pola (błąd)",
+      "event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 400\", function () { pm.response.to.have.status(400); });", "pm.test(\"Format bledu to RFC 7807\", function () { var jsonData = pm.response.json(); pm.expect(jsonData.type).to.include(\"/errors/\"); });" ], "type": "text/javascript" } } ],
+      "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Tylko Imie\"\n}" }, "url": { "raw": "http://localhost:3000/api/v1/heroes", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "heroes"] } }
     },
     {
-      "name": "4. Zamknięcie incydentu",
-      "request": {
-        "method": "PATCH",
-        "header": [],
-        "url": { "raw": "http://localhost:3000/api/v1/incidents/1/resolve", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents", "1", "resolve"] }
-      }
+      "name": "4. Zgłoszenie incydentu (sukces)",
+      "event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });" ], "type": "text/javascript" } } ],
+      "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"location\": \"Bank Centralny\",\n  \"severity_level\": \"critical\"\n}" }, "url": { "raw": "http://localhost:3000/api/v1/incidents", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents"] } }
+    },
+    {
+      "name": "5. Flash (szybkość) 'nie radzi sobie' ze stanem krytycznym (błąd)",
+      "event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 403\", function () { pm.response.to.have.status(403); });", "pm.test(\"Błąd typu FORBIDDEN\", function () { var jsonData = pm.response.json(); pm.expect(jsonData.type).to.eql(\"/errors/forbidden\"); });" ], "type": "text/javascript" } } ],
+      "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"hero_id\": 2\n}" }, "url": { "raw": "http://localhost:3000/api/v1/incidents/1/assign", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents", "1", "assign"] } }
+    },
+    {
+      "name": "6. Hulk (siła) 'radzi sobie' ze stanem krytycznym (sukces)",
+      "event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });", "pm.test(\"Incydent zmienil status na assigned\", function () { var jsonData = pm.response.json(); pm.expect(jsonData.data.status).to.eql(\"assigned\"); });" ], "type": "text/javascript" } } ],
+      "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"hero_id\": 1\n}" }, "url": { "raw": "http://localhost:3000/api/v1/incidents/1/assign", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents", "1", "assign"] } }
+    },
+    {
+      "name": "7. Hulk jest już zajęty (błąd)",
+      "event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 409\", function () { pm.response.to.have.status(409); });", "pm.test(\"Błąd typu CONFLICT\", function () { var jsonData = pm.response.json(); pm.expect(jsonData.type).to.eql(\"/errors/conflict\"); });" ], "type": "text/javascript" } } ],
+      "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"hero_id\": 1\n}" }, "url": { "raw": "http://localhost:3000/api/v1/incidents/1/assign", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents", "1", "assign"] } }
+    },
+    {
+      "name": "8. Zamknięcie incydentu (zwalnia Hulka) (sukces)",
+      "event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });" ], "type": "text/javascript" } } ],
+      "request": { "method": "PATCH", "header": [], "url": { "raw": "http://localhost:3000/api/v1/incidents/1/resolve", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents", "1", "resolve"] } }
+    },
+    {
+      "name": "9. Nieistniejący incydent (błąd)",
+      "event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 404\", function () { pm.response.to.have.status(404); });", "pm.test(\"Błąd typu NOT_FOUND\", function () { var jsonData = pm.response.json(); pm.expect(jsonData.type).to.eql(\"/errors/not_found\"); });" ], "type": "text/javascript" } } ],
+      "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"hero_id\": 1\n}" }, "url": { "raw": "http://localhost:3000/api/v1/incidents/999/assign", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api", "v1", "incidents", "999", "assign"] } }
     }
   ]
 }
