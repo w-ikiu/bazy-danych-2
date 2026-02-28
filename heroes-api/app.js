@@ -1,3 +1,4 @@
+// punkt startowy - glowny plik konfiguracyjny serwera express, ustawia formatowanie JSON i "podlacza" sciezki (routery)
 require('dotenv').config();
 const express = require('express');
 

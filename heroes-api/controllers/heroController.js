@@ -1,3 +1,4 @@
+// odbiera zapytania z zewnatrz (np postman) i przekazuja parametry do Service, zwracaja ostateczny wynik z kodem statusu
 const heroService = require('../services/heroService');
 
 const HTTP_STATUS = {

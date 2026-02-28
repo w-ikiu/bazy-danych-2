@@ -1,3 +1,7 @@
+// laczy aplikacje (node.js) z baza w dockerze
+// pool - zbior aktywnych, utrzymywanych w gotowosci polaczen miedzy aplikacja a baza (mamy maksymalnie 10 takich polaczen)
+// warstwa repositories wykorzystuje te polaczenia
+
 require('dotenv').config();
 const { Pool } = require('pg');
 

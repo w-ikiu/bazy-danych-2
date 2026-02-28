@@ -1,7 +1,11 @@
+// zadaniem Service jest pilnowanie regul biznesowych i walidacja danych przed zapisem do bazy
+
+// ma "dostep" do Repository zeby np uzywac jej funkcji (wyszukiwania bohaterow albo dodawania itd)
 const heroRepository = require('../repositories/heroRepository');
 
 const VALID_POWERS = ['flight', 'strength', 'telepathy', 'speed', 'invisibility'];
 
+// funkcja filtrujaca wiersz danych z bazy (zeby wiersz oddal dokladnie to co chcemy)
 const toDTO = (row) => ({
   id: row.id,
   name: row.name,
@@ -9,12 +13,14 @@ const toDTO = (row) => ({
   status: row.status
 });
 
+// funkcja do formatowania bledow, dzieki temu dodaje do bledu jego kod
 const makeError = (message, code) => {
   const err = new Error(message);
   err.code = code;
   return err;
 };
 
+// uzywa funkcji z repozytorium zeby zwrocic przefiltrowane dane bohaterow
 const findAll = async (filters) => {
   const rows = await heroRepository.findAll(filters);
   return rows.map(toDTO);
