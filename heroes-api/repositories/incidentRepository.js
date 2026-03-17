@@ -57,4 +57,23 @@ const update = async (id, fields, trx = knex) => {
   return incident;
 };
 
-module.exports = { findAll, findById, create, update };
+// pobiera historie incydentow konkretnego bohatera, posortowana malejaco
+const findHistoryByHeroId = async (heroId, { page = 1, pageSize = 10 } = {}) => {
+  const limit = Math.min(parseInt(pageSize, 10) || 10, 50);
+  const currentPage = parseInt(page, 10) || 1;
+  const offset = (currentPage - 1) * limit;
+
+  const query = knex('incidents').where({ hero_id: heroId });
+
+  const [{ count }] = await query.clone().count('id as count');
+  const total = parseInt(count, 10);
+
+  const data = await query.orderBy('assigned_at', 'desc').limit(limit).offset(offset);
+
+  return {
+    data,
+    pagination: { page: currentPage, pageSize: limit, total, totalPages: Math.ceil(total / limit) }
+  };
+};
+
+module.exports = { findAll, findById, create, update, findHistoryByHeroId }; // dodano findHistoryByHeroId

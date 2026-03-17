@@ -1,5 +1,6 @@
 // odbiera zapytania z zewnatrz (np postman) i przekazuje parametry do service, zwracajac ostateczny wynik z kodem statusu
 const heroService = require('../services/heroService');
+const incidentService = require('../services/incidentService'); // dodany import do historii misji
 
 const HTTP_STATUS = {
   NOT_FOUND:        404,
@@ -8,7 +9,7 @@ const HTTP_STATUS = {
   FORBIDDEN:        403,
 };
 
-// handleerror
+// handleerror - musi byc na gorze, zeby inne funkcje mogly z niej korzystac
 const handleError = (err, res) => {
   const status = HTTP_STATUS[err.code] || 500;
   
@@ -55,4 +56,16 @@ const create = async (req, res) => {
   } catch (err) { handleError(err, res); }
 };
 
-module.exports = { getAll, create };
+// getincidents - nowa trasa pobierajaca historie incydentow bohatera
+const getIncidents = async (req, res) => {
+  try {
+    const heroId = parseInt(req.params.id, 10);
+    if (isNaN(heroId)) throw { code: 'VALIDATION_ERROR', message: 'ID musi być liczbą' };
+    
+    const { page, pageSize } = req.query;
+    const result = await incidentService.findHistoryByHeroId(heroId, { page, pageSize });
+    res.json(result);
+  } catch (err) { handleError(err, res); }
+};
+
+module.exports = { getAll, create, getIncidents };

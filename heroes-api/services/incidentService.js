@@ -78,4 +78,12 @@ const resolveIncident = async (incidentId) => {
   });
 };
 
-module.exports = { findAll, create, assignHero, resolveIncident };
+// zwraca historie i rzuca 404 jesli bohater nie istnieje
+const findHistoryByHeroId = async (heroId, filters) => {
+  const hero = await heroRepository.findById(heroId);
+  if (!hero) throw makeError('Bohater nie istnieje', 'NOT_FOUND');
+  
+  return await incidentRepository.findHistoryByHeroId(heroId, filters);
+};
+
+module.exports = { findAll, create, assignHero, resolveIncident, findHistoryByHeroId };

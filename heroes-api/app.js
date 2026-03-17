@@ -4,12 +4,14 @@ const express = require('express');
 
 const heroesRouter = require('./routes/heroes');
 const incidentsRouter = require('./routes/incidents');
+const statsRouter = require('./routes/stats');
 
 const app = express();
 app.use(express.json());
 
 app.use('/api/v1/heroes', heroesRouter);
 app.use('/api/v1/incidents', incidentsRouter);
+app.use('/api/v1/stats', statsRouter);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
