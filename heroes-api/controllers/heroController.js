@@ -1,4 +1,4 @@
-// odbiera zapytania z zewnatrz (np postman) i przekazuja parametry do Service, zwracaja ostateczny wynik z kodem statusu
+// odbiera zapytania z zewnatrz (np postman) i przekazuje parametry do service, zwracajac ostateczny wynik z kodem statusu
 const heroService = require('../services/heroService');
 
 const HTTP_STATUS = {
@@ -8,7 +8,7 @@ const HTTP_STATUS = {
   FORBIDDEN:        403,
 };
 
-// handleError
+// handleerror
 const handleError = (err, res) => {
   const status = HTTP_STATUS[err.code] || 500;
   
@@ -22,13 +22,14 @@ const handleError = (err, res) => {
   });
 };
 
-// getAll
-// GET /api/v1/heroes?status=available&power=flight
+// getall
+// GET /api/v1/heroes?status=available&power=flight&page=1&pageSize=10
 const getAll = async (req, res) => {
   try {
-    const { status, power } = req.query;
-    const heroes = await heroService.findAll({ status, power });
-    res.json({ data: heroes });
+    const { status, power, sortBy, sortDir, page, pageSize } = req.query;
+    const result = await heroService.findAll({ status, power, sortBy, sortDir, page, pageSize });
+    // odeslanie calego wyniku (ma w sobie data i pagination)
+    res.json(result);
   } catch (err) { handleError(err, res); }
 };
 

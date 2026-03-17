@@ -14,22 +14,29 @@ const handleError = (err, res) => {
   });
 };
 
+// pobieramy filtry, dzielnice oraz parametry paginacji
 const getAll = async (req, res) => {
   try {
-    const incidents = await incidentService.findAll({
-      severity_level: req.query.severity_level,
-      status: req.query.status
+    const { severity_level, status, district, page, pageSize } = req.query;
+    const result = await incidentService.findAll({ 
+      level: severity_level, 
+      status, 
+      district, 
+      page, 
+      pageSize 
     });
-    res.json({ data: incidents });
+    // result zwraca format wymagany przez paginacje
+    res.json(result);
   } catch (err) { handleError(err, res); }
 };
 
 const create = async (req, res) => {
   try {
-    const { location, severity_level } = req.body || {};
+    const { location, severity_level, district } = req.body || {};
     if (!location || !severity_level) throw { code: 'VALIDATION_ERROR', message: 'Brakuje location lub severity_level' };
     
-    const incident = await incidentService.create({ location, severity_level });
+    // przekazujemy do serwisu dodatkowy parametr district
+    const incident = await incidentService.create({ location, severity_level, district });
     res.status(201).location(`/api/v1/incidents/${incident.id}`).json({ data: incident });
   } catch (err) { handleError(err, res); }
 };
