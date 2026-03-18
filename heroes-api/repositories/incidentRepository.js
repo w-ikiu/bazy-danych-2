@@ -1,79 +1,75 @@
-// pool -> zastapiony przez knex
-const knex = require('../db/knex');
+const { Incident, Hero } = require('../models');
+const { Op } = require('sequelize');
 
-const findAll = async ({ level, status, district, page = 1, pageSize = 10 } = {}) => {
-  // paginacja - limit max 50 wynikow
-  const limit = Math.min(parseInt(pageSize, 10) || 10, 50);
-  const currentPage = parseInt(page, 10) || 1;
-  const offset = (currentPage - 1) * limit;
+const findAll = async (filters = {}) => {
+  const limit = Math.min(parseInt(filters.pageSize, 10) || 10, 50);
+  const page = parseInt(filters.page, 10) || 1;
+  const offset = (page - 1) * limit;
 
-  // inicjacja query
-  const query = knex('incidents');
+  const options = {
+    limit,
+    offset,
+    order: [['id', 'ASC']],
+    where: {},
+  };
 
-  // opcjonalne filtry
-  if (level) query.where('level', level);
-  if (status) query.where('status', status);
-  
-  // ILIKE dla wyszukiwania dzielnicy
-  if (district) {
-    query.where('district', 'ILIKE', `%${district}%`);
+  if (filters.level) options.where.level = filters.level;
+  if (filters.status) options.where.status = filters.status;
+  if (filters.district) {
+    // odpowiednik ilike z knexa
+    options.where.district = { [Op.iLike]: `%${filters.district}%` };
   }
 
-  // klonowanie zapytania dla zliczenia wszystkich pasujacych rekordow
-  const [{ count }] = await query.clone().count('id as count');
-  const total = parseInt(count, 10);
-
-  // pobranie strony z danymi
-  const data = await query.orderBy('id').limit(limit).offset(offset);
+  const { count, rows } = await Incident.findAndCountAll(options);
 
   return {
-    data,
-    pagination: {
-      page: currentPage,
-      pageSize: limit,
-      total,
-      totalPages: Math.ceil(total / limit)
-    }
+    data: rows,
+    pagination: { page, pageSize: limit, total: count, totalPages: Math.ceil(count / limit) },
   };
 };
 
-// funkcje modyfikujace przyjmuja trx (transakcje), jesli nie jest podana, uzywaja zwyklego polaczenia knex
-const findById = async (id, trx = knex) => {
-  return await trx('incidents').where({ id }).first();
+const findById = async (id, t = null) => {
+  const options = t ? { transaction: t, lock: true } : {};
+  // include to nasz eager loading - dolacza bohatera w jednym zapytaniu sql
+  options.include = [{ 
+    model: Hero, 
+    as: 'hero',
+  }];
+  
+  return await Incident.findByPk(id, options);
 };
 
-const create = async ({ location, level, district }, trx = knex) => {
-  const [incident] = await trx('incidents')
-    .insert({ location, level, district })
-    .returning('*');
-  return incident;
-};
+const findHistoryByHeroId = async (heroId, filters = {}) => {
+  const limit = Math.min(parseInt(filters.pageSize, 10) || 10, 50);
+  const page = parseInt(filters.page, 10) || 1;
+  const offset = (page - 1) * limit;
 
-const update = async (id, fields, trx = knex) => {
-  const [incident] = await trx('incidents')
-    .where({ id })
-    .update(fields)
-    .returning('*');
-  return incident;
-};
-
-// pobiera historie incydentow konkretnego bohatera, posortowana malejaco
-const findHistoryByHeroId = async (heroId, { page = 1, pageSize = 10 } = {}) => {
-  const limit = Math.min(parseInt(pageSize, 10) || 10, 50);
-  const currentPage = parseInt(page, 10) || 1;
-  const offset = (currentPage - 1) * limit;
-
-  const query = knex('incidents').where({ hero_id: heroId });
-
-  const [{ count }] = await query.clone().count('id as count');
-  const total = parseInt(count, 10);
-
-  const data = await query.orderBy('assigned_at', 'desc').limit(limit).offset(offset);
+  const { count, rows } = await Incident.findAndCountAll({
+    where: { hero_id: heroId },
+    order: [['assigned_at', 'DESC']],
+    limit,
+    offset,
+  });
 
   return {
-    data,
-    pagination: { page: currentPage, pageSize: limit, total, totalPages: Math.ceil(total / limit) }
+    data: rows,
+    pagination: { page, pageSize: limit, total: count, totalPages: Math.ceil(count / limit) },
   };
 };
 
-module.exports = { findAll, findById, create, update, findHistoryByHeroId }; // dodano findHistoryByHeroId
+const create = async (data) => {
+  return await Incident.create(data);
+};
+
+const update = async (id, fields, t = null) => {
+  // wyciagamy instancje zeby wymusic zadzialanie hooka po aktualizacji
+  const incident = await Incident.findByPk(id, { transaction: t });
+  
+  if (incident) {
+    await incident.update(fields, { transaction: t });
+  }
+  
+  return incident;
+};
+
+module.exports = { findAll, findById, findHistoryByHeroId, create, update };

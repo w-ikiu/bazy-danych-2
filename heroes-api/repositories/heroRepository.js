@@ -1,43 +1,66 @@
 // tutaj wykonuje sie kod SQL, pobiera albo zapisuje dane w bazie i oddaje gotowe wyniki do Service
 
-// uzywa pool z db.js do polaczen z baza
-const pool = require('../db');
+const { Hero } = require('../models');
 
-// zwraca liste bohaterow, jest wywolywane w np heroService
-const findAll = async ({ status, power } = {}) => {
-  const params = [];
-  const conditions = [];
+const findAll = async (filters = {}) => {
+  // ustalamy limity do paginacji
+  const limit = Math.min(parseInt(filters.pageSize, 10) || 10, 50);
+  const page = parseInt(filters.page, 10) || 1;
+  const offset = (page - 1) * limit;
 
-  if (status) {
-    params.push(status);
-    conditions.push(`status = $${params.length}`);
+  // budujemy opcje zapytania
+  const options = {
+    limit,
+    offset,
+    order: [[filters.sortBy || 'id', filters.sortDir || 'ASC']],
+    where: {},
+  };
+
+  // filtrowanie po mocy
+  if (filters.power) {
+    options.where.power = filters.power;
   }
 
-  if (power) {
-    params.push(power);
-    conditions.push(`power = $${params.length}`);
+  // wykorzystanie scope zdefiniowanego w modelu
+  let query = Hero;
+  if (filters.status === 'available') {
+    query = Hero.scope('available');
+  } else if (filters.status) {
+    options.where.status = filters.status;
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const query = `SELECT id, name, power, status FROM heroes ${whereClause} ORDER BY id`;
+  const { count, rows } = await query.findAndCountAll(options);
 
-  const { rows } = await pool.query(query, params);
-  return rows;
+  return {
+    data: rows,
+    pagination: {
+      page,
+      pageSize: limit,
+      total: count,
+      totalPages: Math.ceil(count / limit),
+    },
+  };
 };
 
-// szuka bohatera po id
-const findById = async (id, client = pool) => {
-  const { rows } = await client.query('SELECT * FROM heroes WHERE id = $1', [id]);
-  return rows[0] || null;
+const findById = async (id, t = null) => {
+  // blokada pesymistyczna uruchamiana gdy podamy transakcje
+  const options = t ? { transaction: t, lock: true } : {};
+  return await Hero.findByPk(id, options);
 };
 
-// dodanie bohatera do bazy, uzywamy $1 i $2 dla bezpieczenstwa
-const create = async ({ name, power }) => {
-  const { rows } = await pool.query(
-    'INSERT INTO heroes (name, power) VALUES ($1, $2) RETURNING *',
-    [name, power]
-  );
-  return rows[0];
+const create = async (data) => {
+  return await Hero.create(data);
 };
 
-module.exports = { findAll, findById, create };
+const update = async (id, fields, t = null) => {
+  // uzywamy individualhooks zeby wywolac hooki przy aktualizacji
+  await Hero.update(fields, {
+    where: { id },
+    transaction: t,
+    individualHooks: true,
+  });
+  
+  return await Hero.findByPk(id, { transaction: t });
+};
+
+module.exports = { findAll, findById, create, update };
