@@ -12,6 +12,12 @@ const findAll = async (filters) => {
   return await incidentRepository.findAll(filters);
 };
 
+const findById = async (id) => {
+  const incident = await incidentRepository.findById(id);
+  if (!incident) throw makeError('Incydent nie istnieje', 'NOT_FOUND');
+  return incident;
+};
+
 const create = async ({ location, severity_level, district }) => {
   if (!location || !severity_level) throw makeError('Brakuje danych', 'VALIDATION_ERROR');
   return await incidentRepository.create({ location, level: severity_level, district });
@@ -69,4 +75,4 @@ const findHistoryByHeroId = async (heroId, filters) => {
   return await incidentRepository.findHistoryByHeroId(heroId, filters);
 };
 
-module.exports = { findAll, create, assignHero, resolveIncident, findHistoryByHeroId };
+module.exports = { findAll, findById, create, assignHero, resolveIncident, findHistoryByHeroId };

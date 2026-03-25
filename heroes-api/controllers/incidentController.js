@@ -30,6 +30,23 @@ const getAll = async (req, res) => {
   } catch (err) { handleError(err, res); }
 };
 
+// pobieranie pojedynczego incydentu po id
+const getById = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).type('application/problem+json').json({
+        type: '/errors/bad-request', title: 'Bad Request', status: 400, detail: 'ID musi być liczbą'
+      });
+    }
+
+    const incident = await incidentService.findById(id);
+    res.json({ data: incident });
+  } catch (err) {
+    handleError(err, res); // zakladam, ze masz tu funkcje handleError jak w bohaterach
+  }
+};
+
 const create = async (req, res) => {
   try {
     const { location, severity_level, district } = req.body || {};
@@ -62,4 +79,4 @@ const resolve = async (req, res) => {
   } catch (err) { handleError(err, res); }
 };
 
-module.exports = { getAll, create, assign, resolve };
+module.exports = { getById, getAll, create, assign, resolve };
