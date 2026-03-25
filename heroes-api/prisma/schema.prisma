@@ -1,0 +1,91 @@
+// konfiguracja generatora klienta
+generator client {
+  provider = "prisma-client-js"
+}
+
+// konfiguracja bazy danych
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ENUMY
+
+enum Power {
+  flight
+  strength
+  telepathy
+  speed
+  invisibility
+}
+
+enum HeroStatus {
+  available
+  busy
+  retired
+}
+
+enum IncidentLevel {
+  low
+  medium
+  critical
+}
+
+enum IncidentStatus {
+  open
+  assigned
+  resolved
+}
+
+// MODELE
+
+model Hero {
+  id            Int         @id @default(autoincrement())
+  name          String      @unique @db.VarChar(120)
+  power         Power
+  status        HeroStatus  @default(available)
+  missionsCount Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // relacja 1:n z incydentami
+  incidents     Incident[]
+}
+
+model Category {
+  id        Int                @id @default(autoincrement())
+  name      String             @unique @db.VarChar(80)
+  
+  // relacja m:n przez tabela posrednia
+  incidents IncidentCategory[]
+}
+
+model Incident {
+  id          Int                @id @default(autoincrement())
+  location    String
+  district    String?
+  level       IncidentLevel
+  status      IncidentStatus     @default(open)
+  
+  // opcjonalny klucz obcy do bohatera
+  heroId      Int?
+  hero        Hero?              @relation(fields: [heroId], references: [id], onDelete: SetNull)
+  
+  assignedAt  DateTime?
+  resolvedAt  DateTime?
+  
+  // relacja m:n przez tabele posrednia
+  categories  IncidentCategory[]
+}
+
+// jawna tabela posrednia (explicit many-to-many)
+model IncidentCategory {
+  incidentId Int
+  categoryId Int
+  
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  // klucz zlozony z dwoch kluczy obcych
+  @@id([incidentId, categoryId])
+}
