@@ -1,78 +1,96 @@
-const { sequelize } = require('../models');
+const prisma = require('../prisma/client');
 const incidentRepository = require('../repositories/incidentRepository');
-const heroRepository = require('../repositories/heroRepository');
 
-const makeError = (message, code) => {
-  const err = new Error(message);
-  err.code = code;
-  return err;
-};
-
-const findAll = async (filters) => {
-  return await incidentRepository.findAll(filters);
+const findAll = async (categoryId, excludeCategoryId) => {
+  return await incidentRepository.findAll(categoryId, excludeCategoryId);
 };
 
 const findById = async (id) => {
   const incident = await incidentRepository.findById(id);
-  if (!incident) throw makeError('Incydent nie istnieje', 'NOT_FOUND');
+  if (!incident) throw new Error('Incydent nie istnieje');
   return incident;
 };
 
-const create = async ({ location, severity_level, district }) => {
-  if (!location || !severity_level) throw makeError('Brakuje danych', 'VALIDATION_ERROR');
-  return await incidentRepository.create({ location, level: severity_level, district });
+const create = async (incidentData, categoryIds) => {
+  return await incidentRepository.create(incidentData, categoryIds);
 };
 
+const getStats = async (level) => {
+  return await incidentRepository.getStats(level);
+};
+
+// interaktywna transakcja dla przypisania bohatera
 const assignHero = async (incidentId, heroId) => {
-  // zarzadzana transakcja sequelize - sama robi commit lub rollback w razie bledu
-  return await sequelize.transaction(async (t) => {
-    // pobieramy z blokada pesymistyczna (lock: true w repozytorium)
-    const incident = await incidentRepository.findByIdWithLock(incidentId, t);
-    if (!incident) throw makeError('Incydent nie istnieje', 'NOT_FOUND');
-    if (incident.status !== 'open') throw makeError('Incydent już obsłużony', 'CONFLICT');
+  // uzywamy interaktywnej transakcji z callbackiem (tx)
+  return await prisma.$transaction(async (tx) => {
+    // wszystkie zapytania wewnatrz uzywaja tx.* a nie prisma.*
+    const incident = await tx.incident.findUnique({ where: { id: parseInt(incidentId, 10) } });
+    if (!incident) throw new Error('Incydent nie istnieje');
+    if (incident.status !== 'open') throw new Error('Incydent nie jest otwarty');
 
-    const hero = await heroRepository.findByIdWithLock(heroId, t);
-    if (!hero) throw makeError('Bohater nie istnieje', 'NOT_FOUND');
-    if (hero.status !== 'available') throw makeError('Bohater zajęty', 'CONFLICT');
+    const hero = await tx.hero.findUnique({ where: { id: parseInt(heroId, 10) } });
+    if (!hero) throw new Error('Bohater nie istnieje');
+    if (hero.status !== 'available') throw new Error('Bohater nie jest dostepny');
 
-    if (incident.level === 'critical' && !['flight', 'strength'].includes(hero.power)) {
-      throw makeError('Zbyt słaba moc na krytyczny incydent', 'FORBIDDEN');
+    // walidacja domenowa rzuca wyjatek przed jakimkolwiek zapisem
+    if (incident.level === 'critical' && hero.power === 'invisibility') {
+      throw new Error('Ta moc jest niewystarczajaca na poziom critical');
     }
 
-    // pamietamy zeby wszedzie przekazac transakcje 't'
-    await heroRepository.update(hero.id, { status: 'busy' }, t);
-    
-    // aktualizacja incydentu
-    return await incidentRepository.update(incident.id, { 
-      status: 'assigned', 
-      hero_id: hero.id,
-      assigned_at: new Date()
-    }, t);
-  }); 
-};
+    // aktualizacja incydentu w transakcji
+    await tx.incident.update({
+      where: { id: incident.id },
+      data: {
+        status: 'assigned',
+        heroId: hero.id,
+        assignedAt: new Date()
+      }
+    });
 
-const resolveIncident = async (incidentId) => {
-  return await sequelize.transaction(async (t) => {
-    const incident = await incidentRepository.findByIdWithLock(incidentId, t);
-    if (!incident) throw makeError('Incydent nie istnieje', 'NOT_FOUND');
-    if (incident.status !== 'assigned') throw makeError('Nie można zamknąć nieprzydzielonego incydentu', 'CONFLICT');
+    // aktualizacja statusu bohatera w transakcji
+    await tx.hero.update({
+      where: { id: hero.id },
+      data: { status: 'busy' }
+    });
 
-    // zwalniamy bohatera, a licznik misji zaktualizuje automatycznie nasz hook w modelu
-    await heroRepository.update(incident.hero_id, { status: 'available' }, t);
-    
-    // zmiana statusu na resolved odpali hooka, ktory tez korzysta z tej samej transakcji
-    return await incidentRepository.update(incident.id, { 
-      status: 'resolved',
-      resolved_at: new Date()
-    }, t);
+    return await tx.incident.findUnique({ where: { id: incident.id } });
   });
 };
 
-const findHistoryByHeroId = async (heroId, filters) => {
-  const hero = await heroRepository.findById(heroId);
-  if (!hero) throw makeError('Bohater nie istnieje', 'NOT_FOUND');
-  
-  return await incidentRepository.findHistoryByHeroId(heroId, filters);
+// interaktywna transakcja dla rozwiazania incydentu
+const resolveIncident = async (incidentId) => {
+  return await prisma.$transaction(async (tx) => {
+    const incident = await tx.incident.findUnique({ where: { id: parseInt(incidentId, 10) } });
+    if (!incident) throw new Error('Incydent nie istnieje');
+    if (incident.status !== 'assigned' || !incident.heroId) throw new Error('Incydent nie jest przypisany');
+
+    const updatedIncident = await tx.incident.update({
+      where: { id: incident.id },
+      data: {
+        status: 'resolved',
+        resolvedAt: new Date()
+      }
+    });
+
+    // wymog zadania: brak ukrytego hooka afterupdate
+    // uzywamy atomowej operacji increment w tej samej transakcji co zmiana statusu
+    await tx.hero.update({
+      where: { id: incident.heroId },
+      data: {
+        status: 'available',
+        missionsCount: { increment: 1 }
+      }
+    });
+
+    return updatedIncident;
+  });
 };
 
-module.exports = { findAll, findById, create, assignHero, resolveIncident, findHistoryByHeroId };
+module.exports = {
+  findAll,
+  findById,
+  create,
+  getStats,
+  assignHero,
+  resolveIncident
+};

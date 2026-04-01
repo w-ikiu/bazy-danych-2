@@ -1,75 +1,101 @@
-const { Incident, Hero } = require('../models');
-const { Op } = require('sequelize');
+const prisma = require('../prisma/client');
 
-const findAll = async (filters = {}) => {
-  const limit = Math.min(parseInt(filters.pageSize, 10) || 10, 50);
-  const page = parseInt(filters.page, 10) || 1;
-  const offset = (page - 1) * limit;
+// pobieranie incydentow z filtrami relacyjnymi (some i none)
+const findAll = async (categoryId, excludeCategoryId) => {
+  const where = {};
 
-  const options = {
-    limit,
-    offset,
-    order: [['id', 'ASC']],
-    where: {},
-  };
-
-  if (filters.level) options.where.level = filters.level;
-  if (filters.status) options.where.status = filters.status;
-  if (filters.district) {
-    // odpowiednik ilike z knexa
-    options.where.district = { [Op.iLike]: `%${filters.district}%` };
+  if (categoryId || excludeCategoryId) {
+    where.categories = {};
+    // operator some: pobiera incydenty, ktore maja te kategorie
+    if (categoryId) {
+      where.categories.some = { categoryId: parseInt(categoryId, 10) };
+    }
+    // operator none: wyklucza incydenty, ktore maja te kategorie
+    if (excludeCategoryId) {
+      where.categories.none = { categoryId: parseInt(excludeCategoryId, 10) };
+    }
   }
 
-  const { count, rows } = await Incident.findAndCountAll(options);
-
-  return {
-    data: rows,
-    pagination: { page, pageSize: limit, total: count, totalPages: Math.ceil(count / limit) },
-  };
-};
-
-const findById = async (id, t = null) => {
-  const options = t ? { transaction: t, lock: true } : {};
-  // include to nasz eager loading - dolacza bohatera w jednym zapytaniu sql
-  options.include = [{ 
-    model: Hero, 
-    as: 'hero',
-  }];
-  
-  return await Incident.findByPk(id, options);
-};
-
-const findHistoryByHeroId = async (heroId, filters = {}) => {
-  const limit = Math.min(parseInt(filters.pageSize, 10) || 10, 50);
-  const page = parseInt(filters.page, 10) || 1;
-  const offset = (page - 1) * limit;
-
-  const { count, rows } = await Incident.findAndCountAll({
-    where: { hero_id: heroId },
-    order: [['assigned_at', 'DESC']],
-    limit,
-    offset,
+  return await prisma.incident.findMany({
+    where,
+    orderBy: { id: 'asc' }
   });
-
-  return {
-    data: rows,
-    pagination: { page, pageSize: limit, total: count, totalPages: Math.ceil(count / limit) },
-  };
 };
 
-const create = async (data) => {
-  return await Incident.create(data);
+// eager loading bez problemu n+1 (include z select)
+const findById = async (id) => {
+  return await prisma.incident.findUnique({
+    where: { id: parseInt(id, 10) },
+    include: {
+      // select na wybranych polach bohatera (wymog zadania)
+      hero: {
+        select: {
+          id: true,
+          name: true,
+          power: true,
+          status: true
+        }
+      },
+      // dolaczenie kategorii przez jawna tabele posrednia
+      categories: {
+        include: {
+          category: true
+        }
+      }
+    }
+  });
 };
 
-const update = async (id, fields, t = null) => {
-  // wyciagamy instancje zeby wymusic zadzialanie hooka po aktualizacji
-  const incident = await Incident.findByPk(id, { transaction: t });
-  
-  if (incident) {
-    await incident.update(fields, { transaction: t });
+// zagniezdzone tworzenie rekordow (nested create) w jednej operacji
+const create = async (incidentData, categoryIds = []) => {
+  return await prisma.incident.create({
+    data: {
+      location: incidentData.location,
+      district: incidentData.district,
+      level: incidentData.level,
+      status: incidentData.status || 'open',
+      // prisma automatycznie stworzy powiazania w tabeli incidentcategory
+      categories: {
+        create: categoryIds.map(id => ({
+          categoryId: parseInt(id, 10)
+        }))
+      }
+    }
+  });
+};
+
+// aktualizacja incydentu z opcjonalnym obiektem transakcji (tx)
+const update = async (id, data, tx = prisma) => {
+  return await tx.incident.update({
+    where: { id: parseInt(id, 10) },
+    data
+  });
+};
+
+// bezpieczne surowe zapytanie sql z tagged template literal
+const getStats = async (levelFilter) => {
+  // rzutowanie count na integer jest potrzebne, by uniknac bledu serializacji bigint w json
+  if (levelFilter) {
+    // bezpieczne parametryzowanie: zmienna przekazana w ${} nie jest wklejana jako tekst!
+    return await prisma.$queryRaw`
+      SELECT status, CAST(COUNT(*) AS INTEGER) as count 
+      FROM "Incident" 
+      WHERE level = ${levelFilter}::"IncidentLevel" 
+      GROUP BY status
+    `;
   }
   
-  return incident;
+  return await prisma.$queryRaw`
+    SELECT status, CAST(COUNT(*) AS INTEGER) as count 
+    FROM "Incident" 
+    GROUP BY status
+  `;
 };
 
-module.exports = { findAll, findById, findHistoryByHeroId, create, update };
+module.exports = {
+  findAll,
+  findById,
+  create,
+  update,
+  getStats
+};
